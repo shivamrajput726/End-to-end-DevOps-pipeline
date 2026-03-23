@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update -y
+apt-get install -y ca-certificates curl apt-transport-https gnupg lsb-release
+
+# Install k3s (single-node)
+PUBLIC_IP="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
+K3S_EXEC="server --write-kubeconfig-mode 644"
+if [[ -n "${PUBLIC_IP}" ]]; then
+  K3S_EXEC="${K3S_EXEC} --tls-san ${PUBLIC_IP}"
+fi
+
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${k3s_version}" INSTALL_K3S_EXEC="${K3S_EXEC}" sh -
+
+# Install Helm
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+systemctl enable k3s
+systemctl restart k3s
+
+echo "k3s installed. kubeconfig: /etc/rancher/k3s/k3s.yaml"
+
