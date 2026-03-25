@@ -62,9 +62,9 @@ docker-push: docker-login
 	docker push "$(DOCKER_IMAGE):$(TAG)"
 
 k8s-apply:
-	kubectl apply -f k8s/00-namespace.yaml
-	kubectl apply -f k8s/10-deployment.yaml
-	kubectl apply -f k8s/20-service.yaml
+	kubectl create namespace "$(K8S_NAMESPACE)" --dry-run=client -o yaml | kubectl apply -f -
+	kubectl -n "$(K8S_NAMESPACE)" apply -f k8s/deployment.yaml
+	kubectl -n "$(K8S_NAMESPACE)" apply -f k8s/service.yaml
 	kubectl -n "$(K8S_NAMESPACE)" set image deployment/devops-demo-api devops-demo-api="$(DOCKER_IMAGE):$(TAG)"
 	kubectl -n "$(K8S_NAMESPACE)" rollout status deployment/devops-demo-api --timeout=180s
 
@@ -75,7 +75,7 @@ monitoring-up:
 	helm upgrade --install "$(HELM_RELEASE)" prometheus-community/kube-prometheus-stack \
 		--namespace "$(MONITORING_NAMESPACE)" \
 		-f monitoring/kube-prometheus-stack-values.yaml
-	kubectl apply -f k8s/30-servicemonitor.yaml
+	@if kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then kubectl apply -f k8s/servicemonitor.yaml; else echo "ServiceMonitor CRD not installed; skipping"; fi
 
 run-all:
 	bash scripts/run-all.sh
