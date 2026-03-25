@@ -113,10 +113,10 @@ docker build -t "$($env:DOCKER_IMAGE):$tag" .
 Write-Log "Pushing image: $($env:DOCKER_IMAGE):$tag"
 docker push "$($env:DOCKER_IMAGE):$tag"
 
-Write-Log "Deploying app manifests (namespace/deploy/service)"
-kubectl apply -f .\k8s\00-namespace.yaml
-kubectl apply -f .\k8s\10-deployment.yaml
-kubectl apply -f .\k8s\20-service.yaml
+Write-Log "Deploying app manifests"
+kubectl create namespace $env:K8S_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n $env:K8S_NAMESPACE apply -f .\k8s\deployment.yaml
+kubectl -n $env:K8S_NAMESPACE apply -f .\k8s\service.yaml
 
 Write-Log "Installing monitoring stack (Prometheus + Grafana)"
 kubectl create namespace $env:MONITORING_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
@@ -126,9 +126,11 @@ helm upgrade --install $env:HELM_RELEASE prometheus-community/kube-prometheus-st
   --namespace $env:MONITORING_NAMESPACE `
   -f .\monitoring\kube-prometheus-stack-values.yaml
 
-Write-Log "Applying ServiceMonitor"
-Wait-Crd "servicemonitors.monitoring.coreos.com"
-kubectl apply -f .\k8s\30-servicemonitor.yaml
+if (Test-Path .\k8s\servicemonitor.yaml) {
+  Write-Log "Applying ServiceMonitor (optional)"
+  Wait-Crd "servicemonitors.monitoring.coreos.com"
+  kubectl apply -f .\k8s\servicemonitor.yaml
+}
 
 Write-Log "Updating deployment image (rolling update)"
 kubectl -n $env:K8S_NAMESPACE set image deployment/devops-demo-api devops-demo-api="$($env:DOCKER_IMAGE):$tag"

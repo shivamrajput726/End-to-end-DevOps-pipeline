@@ -118,7 +118,9 @@ Create these credentials in Jenkins:
 Deploy manifests:
 
 ```bash
-kubectl apply -f k8s/
+kubectl create namespace devops-demo --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n devops-demo apply -f k8s/deployment.yaml
+kubectl -n devops-demo apply -f k8s/service.yaml
 kubectl -n devops-demo get deploy,svc
 ```
 
@@ -127,6 +129,12 @@ Update image (example):
 ```bash
 kubectl -n devops-demo set image deployment/devops-demo-api devops-demo-api=YOUR_DOCKERHUB_USER/devops-demo-api:TAG
 kubectl -n devops-demo rollout status deployment/devops-demo-api
+```
+
+Optional (requires Prometheus Operator / kube-prometheus-stack):
+
+```bash
+kubectl apply -f k8s/servicemonitor.yaml
 ```
 
 Port-forward:

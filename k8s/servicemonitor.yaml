@@ -2,7 +2,6 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: devops-demo-api
-  namespace: devops-demo
   labels:
     release: kube-prometheus-stack
 spec:
@@ -10,8 +9,7 @@ spec:
     matchLabels:
       app: devops-demo-api
   namespaceSelector:
-    matchNames:
-      - devops-demo
+    any: true
   endpoints:
     - port: http
       path: /metrics

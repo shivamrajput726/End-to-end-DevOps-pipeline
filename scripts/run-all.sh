@@ -146,10 +146,10 @@ main() {
   log "Pushing image: ${DOCKER_IMAGE}:${tag}"
   docker push "${DOCKER_IMAGE}:${tag}"
 
-  log "Deploying app manifests (namespace/deploy/service)"
-  kubectl apply -f k8s/00-namespace.yaml
-  kubectl apply -f k8s/10-deployment.yaml
-  kubectl apply -f k8s/20-service.yaml
+  log "Deploying app manifests"
+  kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl -n "$K8S_NAMESPACE" apply -f k8s/deployment.yaml
+  kubectl -n "$K8S_NAMESPACE" apply -f k8s/service.yaml
 
   log "Installing monitoring stack (Prometheus + Grafana)"
   kubectl create namespace "$MONITORING_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
@@ -159,9 +159,11 @@ main() {
     --namespace "$MONITORING_NAMESPACE" \
     -f monitoring/kube-prometheus-stack-values.yaml
 
-  log "Applying ServiceMonitor"
-  wait_crd "servicemonitors.monitoring.coreos.com" 90 2
-  kubectl apply -f k8s/30-servicemonitor.yaml
+  if [[ -f "k8s/servicemonitor.yaml" ]]; then
+    log "Applying ServiceMonitor (optional)"
+    wait_crd "servicemonitors.monitoring.coreos.com" 90 2
+    kubectl apply -f k8s/servicemonitor.yaml
+  fi
 
   log "Updating deployment image (rolling update)"
   kubectl -n "$K8S_NAMESPACE" set image deployment/devops-demo-api devops-demo-api="${DOCKER_IMAGE}:${tag}"

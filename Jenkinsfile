@@ -14,6 +14,7 @@ pipeline {
 
   parameters {
     string(name: 'DOCKER_IMAGE', defaultValue: 'YOUR_DOCKERHUB_USER/devops-demo-api', description: 'Docker Hub repo/image (no tag). Example: myuser/devops-demo-api')
+    booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Run unit tests (pytest) before build.')
     booleanParam(name: 'PUSH_LATEST', defaultValue: true, description: 'Also push :latest tag.')
     booleanParam(name: 'DEPLOY_TO_K8S', defaultValue: true, description: 'Deploy to Kubernetes after pushing image.')
     string(name: 'K8S_NAMESPACE', defaultValue: 'devops-demo', description: 'Namespace to deploy into.')
@@ -31,16 +32,32 @@ pipeline {
       }
     }
 
+    stage('Tests') {
+      when { expression { return params.RUN_TESTS } }
+      steps {
+        script {
+          if (isUnix()) {
+            sh '''
+              set -euo pipefail
+              docker run --rm -v "$PWD:/src" -w /src python:3.12-slim bash -lc "
+                python -m pip install --no-cache-dir --upgrade pip &&
+                pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt &&
+                pytest
+              "
+            '''
+          } else {
+            bat '''
+              @echo off
+              docker run --rm -v "%CD%:/src" -w /src python:3.12-slim bash -lc "python -m pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && pytest"
+            '''
+          }
+        }
+      }
+    }
+
     stage('Build') {
       steps {
         script {
-          def cmdOut = { String unixCmd, String winCmd = null ->
-            if (isUnix()) {
-              return sh(returnStdout: true, script: unixCmd).trim()
-            }
-            return bat(returnStdout: true, script: "@echo off\r\n" + (winCmd ?: unixCmd)).trim()
-          }
-
           def cmd = { String unixCmd, String winCmd = null ->
             if (isUnix()) {
               sh unixCmd
@@ -49,7 +66,8 @@ pipeline {
             }
           }
 
-          def gitSha = cmdOut('git rev-parse --short HEAD')
+          def gitSha = (env.GIT_COMMIT ?: '').take(7)
+          if (!gitSha) { gitSha = 'local' }
           env.IMAGE_TAG = "${env.BUILD_NUMBER}-${gitSha}"
           echo "Building: ${params.DOCKER_IMAGE}:${env.IMAGE_TAG}"
 
