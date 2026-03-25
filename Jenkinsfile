@@ -22,7 +22,6 @@ pipeline {
 
   environment {
     IMAGE_TAG = ''
-    KUBECTL_IMAGE = 'bitnami/kubectl:1.30'
   }
 
   stages {
@@ -35,21 +34,13 @@ pipeline {
     stage('Tests') {
       when { expression { return params.RUN_TESTS } }
       steps {
+        // Run tests as a Docker build stage (no workspace bind-mount required; works with Jenkins-in-Docker).
+        // Dockerfile has a `test` target that runs `pytest`.
         script {
           if (isUnix()) {
-            sh '''
-              set -euo pipefail
-              docker run --rm -v "$PWD:/src" -w /src python:3.12-slim bash -lc "
-                python -m pip install --no-cache-dir --upgrade pip &&
-                pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt &&
-                pytest
-              "
-            '''
+            sh "docker build --target test ."
           } else {
-            bat '''
-              @echo off
-              docker run --rm -v "%CD%:/src" -w /src python:3.12-slim bash -lc "python -m pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt && pytest"
-            '''
+            bat "docker build --target test ."
           }
         }
       }
@@ -133,46 +124,31 @@ pipeline {
               sh """
                 set -euo pipefail
 
-                # Use kubectl via a container so the agent doesn't need kubectl installed.
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig get ns "${params.K8S_NAMESPACE}" >/dev/null 2>&1 || \
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig create ns "${params.K8S_NAMESPACE}"
+                kubectl --kubeconfig "\$KUBECONFIG" get ns "${params.K8S_NAMESPACE}" >/dev/null 2>&1 || \
+                  kubectl --kubeconfig "\$KUBECONFIG" create ns "${params.K8S_NAMESPACE}"
 
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" -v "\$PWD:/work" -w /work ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" apply -f k8s/deployment.yaml
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" -v "\$PWD:/work" -w /work ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" apply -f k8s/service.yaml
+                kubectl --kubeconfig "\$KUBECONFIG" -n "${params.K8S_NAMESPACE}" apply -f k8s/deployment.yaml
+                kubectl --kubeconfig "\$KUBECONFIG" -n "${params.K8S_NAMESPACE}" apply -f k8s/service.yaml
 
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" set image deployment/devops-demo-api devops-demo-api=${params.DOCKER_IMAGE}:${env.IMAGE_TAG}
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" rollout status deployment/devops-demo-api --timeout=180s
+                kubectl --kubeconfig "\$KUBECONFIG" -n "${params.K8S_NAMESPACE}" set image deployment/devops-demo-api devops-demo-api=${params.DOCKER_IMAGE}:${env.IMAGE_TAG}
+                kubectl --kubeconfig "\$KUBECONFIG" -n "${params.K8S_NAMESPACE}" rollout status deployment/devops-demo-api --timeout=180s
 
-                docker run --rm -v "\$KUBECONFIG:/kubeconfig:ro" ${env.KUBECTL_IMAGE} \
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" get pods,svc -o wide
+                kubectl --kubeconfig "\$KUBECONFIG" -n "${params.K8S_NAMESPACE}" get pods,svc -o wide
               """
             } else {
               bat """
                 @echo off
 
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig get ns "${params.K8S_NAMESPACE}" >nul 2>nul || ^
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig create ns "${params.K8S_NAMESPACE}"
+                kubectl --kubeconfig "%KUBECONFIG%" get ns "${params.K8S_NAMESPACE}" >nul 2>nul || ^
+                  kubectl --kubeconfig "%KUBECONFIG%" create ns "${params.K8S_NAMESPACE}"
 
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" -v "%CD%:/work" -w /work ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" apply -f k8s/deployment.yaml
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" -v "%CD%:/work" -w /work ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" apply -f k8s/service.yaml
+                kubectl --kubeconfig "%KUBECONFIG%" -n "${params.K8S_NAMESPACE}" apply -f k8s/deployment.yaml
+                kubectl --kubeconfig "%KUBECONFIG%" -n "${params.K8S_NAMESPACE}" apply -f k8s/service.yaml
 
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" set image deployment/devops-demo-api devops-demo-api=${params.DOCKER_IMAGE}:${env.IMAGE_TAG}
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" rollout status deployment/devops-demo-api --timeout=180s
+                kubectl --kubeconfig "%KUBECONFIG%" -n "${params.K8S_NAMESPACE}" set image deployment/devops-demo-api devops-demo-api=${params.DOCKER_IMAGE}:${env.IMAGE_TAG}
+                kubectl --kubeconfig "%KUBECONFIG%" -n "${params.K8S_NAMESPACE}" rollout status deployment/devops-demo-api --timeout=180s
 
-                docker run --rm -v "%KUBECONFIG%:/kubeconfig:ro" ${env.KUBECTL_IMAGE} ^
-                  kubectl --kubeconfig /kubeconfig -n "${params.K8S_NAMESPACE}" get pods,svc -o wide
+                kubectl --kubeconfig "%KUBECONFIG%" -n "${params.K8S_NAMESPACE}" get pods,svc -o wide
               """
             }
           }
