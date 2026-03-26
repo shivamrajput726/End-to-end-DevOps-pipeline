@@ -1,26 +1,3 @@
-FROM python:3.12-slim AS builder
-
-WORKDIR /build
-COPY requirements.txt .
-
-RUN python -m pip install --no-cache-dir --upgrade pip \
-  && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
-
-
-FROM python:3.12-slim AS test
-
-WORKDIR /src
-COPY requirements.txt requirements-dev.txt ./
-
-RUN python -m pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
-
-COPY app ./app
-COPY tests ./tests
-
-RUN pytest -q
-
-
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -31,11 +8,14 @@ RUN addgroup --system app \
 
 WORKDIR /app
 
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/* \
-  && rm -rf /wheels
+COPY requirements.txt requirements-dev.txt ./
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+  && pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY app ./app
+COPY tests ./tests
+RUN chown -R app:app /app
 
 EXPOSE 8000
 USER app
