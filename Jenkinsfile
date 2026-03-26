@@ -1,14 +1,7 @@
 pipeline {
   agent any
 
-  // Cross-platform helpers: use `sh` on Linux agents and `bat` on Windows agents.
-  // (Jenkins-in-Docker typically runs Linux agents, but this keeps the pipeline portable.)
-  // Note: `bat(returnStdout: true)` includes extra newlines; we `.trim()` outputs where needed.
-  // These helpers are available inside `script {}` blocks.
-
   options {
-    timestamps()
-    ansiColor('xterm')
     disableConcurrentBuilds()
   }
 
@@ -28,6 +21,19 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('Validate') {
+      steps {
+        script {
+          if (params.DOCKER_IMAGE == null || params.DOCKER_IMAGE.trim().length() == 0) {
+            error("DOCKER_IMAGE is empty. Set it to something like: <your-dockerhub-user>/devops-demo-api")
+          }
+          if (params.DOCKER_IMAGE.contains("YOUR_DOCKERHUB_USER")) {
+            error("Replace DOCKER_IMAGE placeholder. Example: myuser/devops-demo-api")
+          }
+        }
       }
     }
 

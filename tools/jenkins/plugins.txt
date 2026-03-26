@@ -1,0 +1,6 @@
+workflow-aggregator
+git
+github
+credentials-binding
+workflow-multibranch
+pipeline-model-definition

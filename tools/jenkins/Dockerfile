@@ -2,6 +2,9 @@ FROM jenkins/jenkins:lts-jdk17
 
 USER root
 
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release \
   && install -m 0755 -d /etc/apt/keyrings \
@@ -18,4 +21,3 @@ RUN curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL
   && chmod +x /usr/local/bin/kubectl
 
 USER jenkins
-

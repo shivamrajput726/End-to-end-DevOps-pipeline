@@ -1,6 +1,7 @@
 # Jenkins (Docker) for this repo
 
 This repo includes a Jenkins controller image (with `docker` CLI and `kubectl`) and a `docker-compose.yml` to run it locally.
+It also installs required Jenkins plugins from `tools/jenkins/plugins.txt`.
 
 ## 1) Start Jenkins
 
@@ -54,4 +55,3 @@ Jenkins -> **New Item** -> **Pipeline**
 - Script Path: `Jenkinsfile`
 
 Run **Build with Parameters** and set `DOCKER_IMAGE` to your Docker Hub repo, e.g. `myuser/devops-demo-api`.
-
