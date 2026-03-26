@@ -9,9 +9,7 @@ __pycache__
 .DS_Store
 *.log
 
-tests
 infra
 k8s
 monitoring
 docs
-
