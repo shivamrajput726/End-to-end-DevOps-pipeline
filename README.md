@@ -19,7 +19,7 @@ flowchart LR
   J -->|security scan| TV[Trivy]
   J -->|build| DI[Docker Image]
   DI -->|push| DH[(Docker Hub)]
-  J -->|kubectl set image| K8S[Kubernetes (k3s/EKS)]
+ J -->|kubectl set image| K8S["Kubernetes k3s EKS"]
   K8S --> SVC[Service]
   K8S --> PODS[Pods (RollingUpdate)]
   PODS -->|/metrics| PR[Prometheus]
